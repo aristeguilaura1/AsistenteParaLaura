@@ -12,12 +12,15 @@ Automatización semanal para carga de horas en el sistema NEORIS Timecard.
 - ✅ **40 horas exactas** distribuidas en días laborables
 - ✅ **No interfiere** con pestañas Chrome existentes
 - ✅ **Email automático** con copia a Matías Muñoz
+- ⚡ **100% automático** - Sin confirmaciones manuales
 
 ## 🎪 Uso Semanal
 
 ```bash
 python carga_horas_simple.py
 ```
+
+**⚡ Proceso 100% automático** - Sin confirmaciones manuales necesarias
 
 ## 📊 Mapeo de Días
 
@@ -72,22 +75,31 @@ El sistema envía automáticamente email de confirmación:
 - **Respeta pestañas existentes** de Chrome
 - **No interfiere** con el trabajo del usuario
 
-## 📈 Proceso Automático
+## 📈 Proceso 100% Automático
 
 1. **Inicialización**: Nueva ventana Chrome del agente
 2. **Navegación**: Acceso automático a timecard NEORIS
 3. **Procesamiento**: Solo addr2-addr6 (Monday-Friday)
 4. **Carga**: 8 horas por día laborable (total 40)
-5. **Verificación**: Hours_TC = 40 confirmado
+5. **Verificación**: Hours_TC = 40 confirmado automáticamente
 6. **Guardado**: Persistencia automática de datos
-7. **Email**: Confirmación con copia a Matías
-8. **Finalización**: Opción de cerrar ventana del agente
+7. **Cierre navegador**: Automático al finalizar
+8. **Email**: Envío automático con copia a Matías
+9. **Finalización**: Sin intervención manual requerida
 
-## 🎯 Versión Actual: V4 - ANTI SUNDAY
+⚡ **Cero intervención manual** - El agente ejecuta todo el flujo de forma autónoma
 
-**Fecha:** 06/02/2026  
+## 🎯 Versión Actual: V4.1 - ANTI SUNDAY + TOTALMENTE AUTOMÁTICO
+
+**Fecha:** 12/02/2026  
 **Estado:** ✅ Funcional y probado  
-**Última mejora:** Exclusión absoluta de addr1 (Sunday)  
+**Última mejora:** Automatización completa sin confirmaciones manuales
+
+### Changelog V4.1:
+- ✅ Eliminadas confirmaciones manuales
+- ✅ Cierre automático del navegador
+- ✅ Envío automático de email
+- ✅ Flujo 100% autónomo  
 
 ---
 

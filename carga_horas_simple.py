@@ -313,15 +313,8 @@ class CargaHorasSimple:
                     print(f"✓ Los {dias_completados} días laborables se persistieron correctamente")
                     print("✓ El sistema reconoce las 40 horas semanales")
                     print("🚫 CONFIRMADO: Sunday NO fue tocado")
-                    
-                    respuesta = input(f"\n🎉 ¿Confirmas que todo está correcto? (s/n, default=s): ").lower().strip()
-                    
-                    if respuesta in ['', 's', 'si', 'sí', 'yes', 'y']:
-                        print("\n🏆 ¡ÉXITO TOTAL! Carga completada sin tocar Sunday.")
-                        return True
-                    else:
-                        print("\n🤔 Revisión manual indicó problemas pese a verificación automática.")
-                        return False
+                    print("\n🏆 ¡ÉXITO TOTAL! Carga completada sin tocar Sunday.")
+                    return True
                         
                 else:
                     print(f"❌ VERIFICACIÓN AUTOMÁTICA FALLÓ: Hours_TC ≠ 40")
@@ -330,15 +323,8 @@ class CargaHorasSimple:
                     print("   • Las entradas no se confirman correctamente")
                     print("   • Algún día laborable no se persistió")
                     print("   • Falta algún paso de validación")
-                    
-                    respuesta = input(f"\n¿Quieres continuar pese a la verificación fallida? (s/n): ").lower().strip()
-                    
-                    if respuesta in ['s', 'si', 'sí', 'yes', 'y']:
-                        print("\n⚠️ Continuando pese a verificación fallida...")
-                        return True
-                    else:
-                        print(f"\n❌ Proceso marcado como fallido. Hours_TC = '{total_horas}' ≠ 40")
-                        return False
+                    print(f"\n❌ Proceso marcado como fallido. Hours_TC = '{total_horas}' ≠ 40")
+                    return False
                 
             except Exception as e:
                 print(f"💥 Error guardando: {e}")
@@ -487,34 +473,33 @@ Agente Simple"""
             
             carga_exitosa = self.cargar_horas_estrategia_simple()
             
+            # Cerrar navegador automáticamente
+            print("\n🔒 Cerrando navegador del agente automáticamente...")
+            if hasattr(self, 'driver') and self.driver:
+                try:
+                    self.driver.quit()
+                    print("✅ Navegador cerrado")
+                except Exception as e:
+                    print(f"⚠️ Navegador ya cerrado o error: {e}")
+            
+            # Enviar correo automáticamente si la carga fue exitosa
             if carga_exitosa:
-                print("📧 Enviando correo de confirmación...")
+                print("\n📧 Enviando correo de confirmación automáticamente...")
                 self.enviar_notificacion_outlook(email)
             else:
                 print("❌ No se enviará correo debido a problemas persistentes")
                 
-            print("\n✅ Proceso V2 completado")
+            print("\n✅ Proceso completado")
             
         except Exception as e:
             print(f"💥 Error en ejecución: {e}")
-        
-        finally:
-            # Preguntar si cerrar SOLO el navegador del agente
+            # Intentar cerrar navegador incluso si hay error
             try:
                 if hasattr(self, 'driver') and self.driver:
-                    print("\n" + "="*50)
-                    print("🔒 CERRAR NAVEGADOR DEL AGENTE")
-                    print("💡 (Esto NO afectará tus otras pestañas de Chrome)")
-                    cerrar = input("¿Cerrar solo la ventana del agente? (s/n, default=n): ").lower().strip()
-                    
-                    if cerrar in ['s', 'si', 'sí', 'yes', 'y']:
-                        print("🔒 Cerrando SOLO el navegador del agente...")
-                        self.driver.quit()
-                        print("✅ Navegador del agente cerrado (tus pestañas conservadas)")
-                    else:
-                        print("🌐 Navegador del agente permanece abierto para revisión")
-            except Exception as e:
-                print(f"⚠️ Error gestionando navegador: {e}")
+                    print("🔒 Cerrando navegador...")
+                    self.driver.quit()
+            except:
+                pass
 
 # Configuración
 if __name__ == "__main__":
