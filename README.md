@@ -51,6 +51,27 @@ python -m pip install selenium schedule webdriver-manager keyboard
 python carga_horas_simple.py
 ```
 
+## 📧 Sistema de Notificaciones
+
+### Enviar notificación automática a Matías
+
+Después de hacer cambios, usa:
+
+```bash
+# Con mensaje inline
+python sync_repositorio.py "Tu mensaje de commit aquí"
+
+# O sin mensaje (te pide escribirlo)
+python sync_repositorio.py
+```
+
+**Qué hace:**
+1. ✅ Verifica cambios pendientes
+2. 📦 Prepara los archivos modificados
+3. 💾 Realiza el commit
+4. 🚀 Hace push al repositorio
+5. 📧 Envía mail automático a Matías con detalles del cambio
+
 ## 📧 Email Automático
 
 El sistema envía automáticamente email de confirmación:
