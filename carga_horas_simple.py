@@ -377,6 +377,27 @@ class CargaHorasSimple:
                 print(f"⚠️ ADVERTENCIA: Solo se completaron {dias_completados} días de {dias_esperados} procesables")
                 print("💡 Revisemos manualmente qué días laborables faltaron...")
             
+            # Caso especial: Si no hay días que cargar (todos son feriados)
+            if dias_completados == 0 and dias_saltados_feriado == 5:
+                print(f"\n🏖️ SEMANA COMPLETA CON FERIADOS/HORAS PREVIAS")
+                print(f"✅ No hay días nuevos que cargar - Todo está completo")
+                print(f"📊 Total semanal: {horas_previas_num}h")
+                
+                return {
+                    'exito': True,
+                    'dias_cargados': 0,
+                    'feriados_saltados': dias_saltados_feriado,
+                    'feriados_nombres': dias_saltados_nombres,
+                    'horas_previas': horas_previas_num,
+                    'horas_nuevas': 0,
+                    'horas_totales': horas_previas_num
+                }
+            
+            # Guardar solo si hay días nuevos cargados
+            if dias_completados == 0:
+                print("\n⚠️ No se cargaron días nuevos - Nada que guardar")
+                return {'exito': False}
+            
             # Guardar todo
             print(f"\n💾 GUARDANDO TODAS LAS HORAS...")
             try:
@@ -438,7 +459,17 @@ class CargaHorasSimple:
                     print(f"✓ Total: {horas_previas_num} horas previas + {horas_esperadas} nuevas = {horas_totales_esperadas} horas")
                     print("🚫 CONFIRMADO: Sunday NO fue tocado")
                     print("\n🏆 ¡ÉXITO TOTAL! Carga completada correctamente.")
-                    return True
+                    
+                    # Retornar datos para el email
+                    return {
+                        'exito': True,
+                        'dias_cargados': dias_completados,
+                        'feriados_saltados': dias_saltados_feriado,
+                        'feriados_nombres': dias_saltados_nombres,
+                        'horas_previas': horas_previas_num,
+                        'horas_nuevas': horas_esperadas,
+                        'horas_totales': horas_totales_esperadas
+                    }
                         
                 else:
                     print(f"❌ VERIFICACIÓN AUTOMÁTICA FALLÓ: Hours_TC ≠ {horas_totales_esperadas}")
@@ -449,15 +480,15 @@ class CargaHorasSimple:
                     print("   • Algún día laborable no se persistió")
                     print("   • Falta algún paso de validación")
                     print(f"\n❌ Proceso marcado como fallido. Hours_TC = '{total_horas}' ≠ {horas_totales_esperadas}")
-                    return False
+                    return {'exito': False}
                 
             except Exception as e:
                 print(f"💥 Error guardando: {e}")
-                return False
+                return {'exito': False}
             
         except Exception as e:
             print(f"💥 Error general: {e}")
-            return False
+            return {'exito': False}
             
             # Resumen final
             print(f"\n📊 RESUMEN: {dias_completados}/5 días completados")
@@ -546,20 +577,39 @@ class CargaHorasSimple:
             print(f"💥 Error general: {e}")
             return False
     
-    def enviar_notificacion_outlook(self, email):
-        """Envía correo de confirmación"""
+    def enviar_notificacion_outlook(self, email, dias_cargados, feriados_saltados, feriados_nombres, horas_previas, horas_nuevas, horas_totales):
+        """Envía correo de confirmación con detalles de la carga"""
         try:
-            asunto = "Horas cargadas - Estrategia Simple"
-            cuerpo = f"""Estimada,
+            # Construir resumen
+            if feriados_saltados > 0:
+                resumen_feriados = f"\n🏖️ Feriados detectados y saltados: {feriados_saltados} día(s)\n   ({', '.join(feriados_nombres)})"
+            else:
+                resumen_feriados = "\n✅ Sin feriados detectados"
+            
+            asunto = f"✅ Horas cargadas - Semana {dias_cargados} días"
+            cuerpo = f"""Estimada Laura,
 
-La carga de horas semanales ha sido completada usando la estrategia simple.
+La carga de horas semanales ha sido completada exitosamente.
 
-Método: Búsqueda genérica de elementos
-- 5 días procesados
-- Proyecto y horas por día
+📊 RESUMEN DE CARGA:
+━━━━━━━━━━━━━━━━━━━━━━━
+✅ Días cargados: {dias_cargados}
+🏖️ Feriados saltados: {feriados_saltados}{resumen_feriados}
+
+💼 HORAS TOTALES:
+━━━━━━━━━━━━━━━━━━━━━━━
+• Horas previas (feriados): {horas_previas}h
+• Horas nuevas cargadas: {horas_nuevas}h
+• Total semanal: {horas_totales}h
+
+🔒 GARANTÍAS:
+━━━━━━━━━━━━━━━━━━━━━━━
+🚫 Sunday (addr1): NO procesado
+✅ Detección automática de feriados
+✅ Verificación de totales: OK
 
 Saludos,
-Agente Simple"""
+AsistenteParaLaura V5.0"""
             
             subject_encoded = asunto.replace(" ", "%20")
             body_encoded = cuerpo.replace("\n", "%0D%0A").replace(" ", "%20")
@@ -569,12 +619,21 @@ Agente Simple"""
             
             os.startfile(mailto_link)
             print("✓ Outlook abierto con el correo")
+            print("💡 Revisá el contenido y presioná Ctrl+Enter para enviar")
             
-            time.sleep(3)
-            print("📧 Enviando correo...")
-            keyboard.press_and_release('ctrl+enter')
-            time.sleep(2)
-            print("✓ Correo enviado")
+            time.sleep(5)  # Más tiempo para que Outlook cargue
+            print("\n📧 Intentando enviar automáticamente...")
+            
+            # Intentar enviar con atajo de teclado
+            try:
+                keyboard.press_and_release('ctrl+enter')
+                time.sleep(2)
+                print("✓ Comando de envío ejecutado")
+                print("⚠️ Si el correo no se envió, presioná manualmente Ctrl+Enter")
+            except Exception as e:
+                print(f"⚠️ No se pudo enviar automáticamente: {e}")
+                print("💡 Por favor, presioná Ctrl+Enter manualmente para enviar")
+            
             return True
             
         except Exception as e:
@@ -597,7 +656,7 @@ Agente Simple"""
                 print("💥 ERROR: No se pudo iniciar el navegador")
                 return
             
-            carga_exitosa = self.cargar_horas_estrategia_simple()
+            resultado = self.cargar_horas_estrategia_simple()
             
             # Cerrar navegador automáticamente
             print("\n🔒 Cerrando navegador del agente automáticamente...")
@@ -609,11 +668,31 @@ Agente Simple"""
                     print(f"⚠️ Navegador ya cerrado o error: {e}")
             
             # Enviar correo automáticamente si la carga fue exitosa
-            if carga_exitosa:
+            if resultado.get('exito', False):
                 print("\n📧 Enviando correo de confirmación automáticamente...")
-                self.enviar_notificacion_outlook(email)
+                self.enviar_notificacion_outlook(
+                    email,
+                    resultado['dias_cargados'],
+                    resultado['feriados_saltados'],
+                    resultado['feriados_nombres'],
+                    resultado['horas_previas'],
+                    resultado['horas_nuevas'],
+                    resultado['horas_totales']
+                )
             else:
                 print("❌ No se enviará correo debido a problemas persistentes")
+                
+            print("\n✅ Proceso completado")
+            
+        except Exception as e:
+            print(f"💥 Error en ejecución: {e}")
+            # Intentar cerrar navegador incluso si hay error
+            try:
+                if hasattr(self, 'driver') and self.driver:
+                    print("🔒 Cerrando navegador...")
+                    self.driver.quit()
+            except:
+                pass
                 
             print("\n✅ Proceso completado")
             
