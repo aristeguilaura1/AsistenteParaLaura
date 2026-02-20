@@ -50,6 +50,50 @@ class CargaHorasSimple:
             print(f"❌ Error iniciando navegador del agente: {e}")
             return False
     
+    def verificar_horas_iniciales(self):
+        """Verifica si ya hay horas cargadas al inicio"""
+        try:
+            wait = WebDriverWait(self.driver, 10)
+            elemento_hours = wait.until(EC.presence_of_element_located((By.XPATH, "//*[@id='Hours_TC']")))
+            horas_actuales = elemento_hours.text.strip()
+            
+            print(f"\n📊 Horas totales al inicio: {horas_actuales}")
+            
+            if horas_actuales not in ['0', '0.0', '']:
+                print(f"⚠️ DETECTADAS horas pre-cargadas: {horas_actuales} horas")
+                print("💡 Verificaré cada día para detectar feriados/entradas aprobadas")
+                return True, horas_actuales
+            else:
+                print("✅ No hay horas pre-cargadas")
+                return False, "0"
+                
+        except Exception as e:
+            print(f"⚠️ Error verificando horas iniciales: {e}")
+            return False, "0"
+    
+    def verificar_horas_en_dia(self, dia_hours_id):
+        """
+        Verifica si un día específico ya tiene horas cargadas
+        usando el XPath //*[@id="Mon_hours"], //*[@id="Tue_hours"], etc.
+        """
+        try:
+            elemento_horas = self.driver.find_element(By.XPATH, f"//*[@id='{dia_hours_id}']")
+            horas_dia = elemento_horas.text.strip()
+            
+            # Convertir a número para comparar
+            try:
+                horas_num = float(horas_dia) if horas_dia else 0
+                if horas_num > 0:
+                    return True, horas_num
+                else:
+                    return False, 0
+            except ValueError:
+                return False, 0
+            
+        except Exception as e:
+            # Si no se encuentra el elemento, asumir que no hay horas
+            return False, 0
+    
     def cargar_horas_estrategia_simple(self):
         """SOLO días laborables: Monday, Tuesday, Wednesday, Thursday, Friday"""
         try:
@@ -57,7 +101,11 @@ class CargaHorasSimple:
             print("⏳ Esperando que cargue la página...")
             time.sleep(5)
             
-            print("🎯 ESTRATEGIA: SOLO addr2-addr6 (NO addr1=Sunday)")
+            # NUEVO: Verificar horas iniciales
+            hay_horas_previas, horas_previas = self.verificar_horas_iniciales()
+            
+            print("\n🎯 ESTRATEGIA: SOLO addr2-addr6 (NO addr1=Sunday)")
+            print("🏖️ DETECCIÓN: Saltará automáticamente días feriados ya aprobados")
             print("🚫 addr1=Sunday EXCLUIDO - Solo procesamos addr2→addr6")
             print("✅ addr2=Monday, addr3=Tuesday, addr4=Wednesday, addr5=Thursday, addr6=Friday")
             print("="*60)
@@ -70,22 +118,64 @@ class CargaHorasSimple:
             # addr5 = Thursday -> SÍ (8 horas)
             # addr6 = Friday   -> SÍ (8 horas)
             dias_laborables_config = {
-                'Monday': {'dia_es': 'LUNES', 'buscar_texto': ['monday', 'lunes', 'Mon'], 'addr': 'addr2'},
-                'Tuesday': {'dia_es': 'MARTES', 'buscar_texto': ['tuesday', 'martes', 'Tue'], 'addr': 'addr3'}, 
-                'Wednesday': {'dia_es': 'MIÉRCOLES', 'buscar_texto': ['wednesday', 'miércoles', 'Wed'], 'addr': 'addr4'},
-                'Thursday': {'dia_es': 'JUEVES', 'buscar_texto': ['thursday', 'jueves', 'Thu'], 'addr': 'addr5'},
-                'Friday': {'dia_es': 'VIERNES', 'buscar_texto': ['friday', 'viernes', 'Fri'], 'addr': 'addr6'}
+                'Monday': {
+                    'dia_es': 'LUNES', 
+                    'buscar_texto': ['monday', 'lunes', 'Mon'], 
+                    'addr': 'addr2',
+                    'hours_id': 'Mon_hours'
+                },
+                'Tuesday': {
+                    'dia_es': 'MARTES', 
+                    'buscar_texto': ['tuesday', 'martes', 'Tue'], 
+                    'addr': 'addr3',
+                    'hours_id': 'Tue_hours'
+                }, 
+                'Wednesday': {
+                    'dia_es': 'MIÉRCOLES', 
+                    'buscar_texto': ['wednesday', 'miércoles', 'Wed'], 
+                    'addr': 'addr4',
+                    'hours_id': 'Wed_hours'
+                },
+                'Thursday': {
+                    'dia_es': 'JUEVES', 
+                    'buscar_texto': ['thursday', 'jueves', 'Thu'], 
+                    'addr': 'addr5',
+                    'hours_id': 'Thu_hours'
+                },
+                'Friday': {
+                    'dia_es': 'VIERNES', 
+                    'buscar_texto': ['friday', 'viernes', 'Fri'], 
+                    'addr': 'addr6',
+                    'hours_id': 'Fri_hours'
+                }
             }
             
             dias_completados = 0
+            dias_saltados_feriado = 0
+            dias_saltados_nombres = []
             
             for dia_nombre, config in dias_laborables_config.items():
                 dia_es = config['dia_es']
                 textos_busqueda = config['buscar_texto']
                 addr_correspondiente = config['addr']
+                hours_id = config['hours_id']
                 
                 print(f"\n📅 === {dia_es} ({dia_nombre}) - {addr_correspondiente} ===")
                 print(f"   🔍 Procesando {addr_correspondiente}: {textos_busqueda}")
+                
+                # NUEVO: Verificar si este día ya tiene horas cargadas
+                if hay_horas_previas:
+                    print(f"   🔎 Verificando {hours_id}...")
+                    tiene_horas, horas_cargadas = self.verificar_horas_en_dia(hours_id)
+                    
+                    if tiene_horas:
+                        print(f"      🏖️ DÍA CON HORAS DETECTADO: {dia_nombre} ya tiene {horas_cargadas} horas!")
+                        print(f"         ⏭️ SALTANDO {dia_nombre} - No se cargará")
+                        dias_saltados_feriado += 1
+                        dias_saltados_nombres.append(dia_nombre)
+                        continue
+                    else:
+                        print(f"      ✅ {hours_id} = 0, proceder a cargar")
                 
                 boton_encontrado = False
                 
@@ -259,11 +349,32 @@ class CargaHorasSimple:
                     continue
             
             # Resumen final
-            print(f"\n📊 RESUMEN ANTI-SUNDAY: {dias_completados}/5 días laborables completados")
-            print("🚫 CONFIRMADO: NO se tocó Sunday ni Saturday")
+            print(f"\n📊 RESUMEN ANTI-SUNDAY:")
+            print(f"   ✅ Días cargados: {dias_completados}")
+            print(f"   🏖️ Feriados saltados: {dias_saltados_feriado}")
+            if dias_saltados_nombres:
+                print(f"      Días feriados: {', '.join(dias_saltados_nombres)}")
+            print(f"   📌 Total días procesables: {5 - dias_saltados_feriado}")
+            print("   🚫 CONFIRMADO: NO se tocó Sunday ni Saturday")
             
-            if dias_completados < 5:
-                print(f"⚠️ ADVERTENCIA: Solo se completaron {dias_completados} días laborables de 5")
+            # Calcular horas esperadas
+            horas_esperadas = (5 - dias_saltados_feriado) * 8
+            
+            try:
+                horas_previas_num = float(horas_previas) if horas_previas else 0
+            except:
+                horas_previas_num = 0
+            
+            if horas_previas_num > 0:
+                print(f"\n💡 Horas a cargar: {horas_esperadas}h (en {5 - dias_saltados_feriado} días × 8h)")
+                print(f"   Horas previas: {horas_previas_num}h (feriados)")
+                print(f"   Total esperado: {horas_previas_num + horas_esperadas}h")
+            else:
+                print(f"\n💡 Horas esperadas a cargar: {horas_esperadas} ({5 - dias_saltados_feriado} días × 8h)")
+            
+            dias_esperados = 5 - dias_saltados_feriado
+            if dias_completados < dias_esperados:
+                print(f"⚠️ ADVERTENCIA: Solo se completaron {dias_completados} días de {dias_esperados} procesables")
                 print("💡 Revisemos manualmente qué días laborables faltaron...")
             
             # Guardar todo
@@ -289,14 +400,24 @@ class CargaHorasSimple:
                     elemento_total = wait.until(EC.presence_of_element_located((By.XPATH, "//*[@id='Hours_TC']")))
                     total_horas = elemento_total.text.strip()
                     
-                    print(f"📈 Hours_TC actual: '{total_horas}'")
+                    # Calcular total esperado: horas previas + horas nuevas
+                    try:
+                        horas_previas_num = float(horas_previas) if horas_previas else 0
+                    except:
+                        horas_previas_num = 0
                     
-                    if total_horas == "40" or total_horas == "40.0":
-                        print("🎉 ¡VERIFICACIÓN EXITOSA! Hours_TC = 40")
-                        print("✅ CONFIRMADO: Solo días laborables cargados correctamente")
+                    horas_totales_esperadas = horas_previas_num + horas_esperadas
+                    
+                    print(f"📈 Hours_TC actual: '{total_horas}'")
+                    print(f"📊 Cálculo: {horas_previas_num} (previas) + {horas_esperadas} (nuevas) = {horas_totales_esperadas} esperadas")
+                    
+                    # Comparar con las horas esperadas totales
+                    if total_horas == str(int(horas_totales_esperadas)) or total_horas == f"{horas_totales_esperadas}":
+                        print(f"🎉 ¡VERIFICACIÓN EXITOSA! Hours_TC = {horas_totales_esperadas}")
+                        print(f"✅ CONFIRMADO: {dias_completados} días cargados + {dias_saltados_feriado} feriados = Correcto")
                         verificacion_automatica = True
                     else:
-                        print(f"⚠️ VERIFICACIÓN FALLÓ: Hours_TC = '{total_horas}' (esperado: 40)")
+                        print(f"⚠️ VERIFICACIÓN FALLÓ: Hours_TC = '{total_horas}' (esperado: {horas_totales_esperadas})")
                         verificacion_automatica = False
                         
                 except Exception as e:
@@ -309,21 +430,25 @@ class CargaHorasSimple:
                 print("="*60)
                 
                 if verificacion_automatica:
-                    print("✅ VERIFICACIÓN AUTOMÁTICA: Hours_TC = 40 ✅")
-                    print(f"✓ Los {dias_completados} días laborables se persistieron correctamente")
-                    print("✓ El sistema reconoce las 40 horas semanales")
+                    print(f"✅ VERIFICACIÓN AUTOMÁTICA: Hours_TC = {horas_totales_esperadas} ✅")
+                    print(f"✓ Los {dias_completados} días laborables se cargaron correctamente")
+                    if dias_saltados_feriado > 0:
+                        print(f"🏖️ {dias_saltados_feriado} día(s) feriado(s) fueron saltados correctamente")
+                        print(f"   Feriados: {', '.join(dias_saltados_nombres)}")
+                    print(f"✓ Total: {horas_previas_num} horas previas + {horas_esperadas} nuevas = {horas_totales_esperadas} horas")
                     print("🚫 CONFIRMADO: Sunday NO fue tocado")
-                    print("\n🏆 ¡ÉXITO TOTAL! Carga completada sin tocar Sunday.")
+                    print("\n🏆 ¡ÉXITO TOTAL! Carga completada correctamente.")
                     return True
                         
                 else:
-                    print(f"❌ VERIFICACIÓN AUTOMÁTICA FALLÓ: Hours_TC ≠ 40")
-                    print(f"📊 Días laborables procesados: {dias_completados}/5")
+                    print(f"❌ VERIFICACIÓN AUTOMÁTICA FALLÓ: Hours_TC ≠ {horas_totales_esperadas}")
+                    print(f"📊 Días laborables cargados: {dias_completados}")
+                    print(f"🏖️ Feriados saltados: {dias_saltados_feriado}")
                     print("🔍 Problemas posibles:")
                     print("   • Las entradas no se confirman correctamente")
                     print("   • Algún día laborable no se persistió")
                     print("   • Falta algún paso de validación")
-                    print(f"\n❌ Proceso marcado como fallido. Hours_TC = '{total_horas}' ≠ 40")
+                    print(f"\n❌ Proceso marcado como fallido. Hours_TC = '{total_horas}' ≠ {horas_totales_esperadas}")
                     return False
                 
             except Exception as e:
@@ -458,11 +583,12 @@ Agente Simple"""
     
     def ejecutar(self, email):
         """Ejecuta la estrategia simple completa"""
-        print("🚀 Iniciando CargaHorasSimple V4 - ANTI SUNDAY")
+        print("🚀 Iniciando CargaHorasSimple V5 - ANTI SUNDAY + DETECCIÓN FERIADOS")
         print("💡 GARANTIZA: Solo Monday-Friday (NO Sunday/Saturday)")
+        print("🏖️ DETECTA: Feriados automáticamente (no carga si ya están aprobados)")
         print("✅ NO cerrará tus pestañas de Chrome existentes")
         print("🚫 NUNCA tocará Sunday ni Saturday")
-        print("="*55)
+        print("="*70)
         
         try:
             # Verificar que el navegador se inicie correctamente

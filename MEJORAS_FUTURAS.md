@@ -41,6 +41,17 @@
 
 ## ✅ Mejoras Completadas
 
+### V5.0 (20/02/2026) - DETECCIÓN INTELIGENTE DE FERIADOS
+- ✅ Verificación inicial de Hours_TC para detectar horas pre-cargadas
+- ✅ Detección por día usando Mon_hours, Tue_hours, Wed_hours, Thu_hours, Fri_hours
+- ✅ Salto automático de días con horas > 0 (feriados)
+- ✅ Cálculo dinámico: horas previas + horas nuevas = total esperado
+- ✅ Verificación ajustada para semanas con feriados
+- ✅ Reportes mejorados con días feriados saltados
+- ✅ Manejo robusto de semanas irregulares
+
+**Impacto:** El agente ahora funciona correctamente en semanas con feriados cargados por la empresa, evitando duplicar horas.
+
 ### V4.1 (12/02/2026)
 - ✅ Automatización completa sin confirmaciones manuales
 - ✅ Cierre automático del navegador
