@@ -1,10 +1,10 @@
-# 🎯 AsistenteParaLaura - CargaHorasSimple V5
+# 🎯 AsistenteParaLaura - CargaHorasSimple V5.2
 
 Automatización semanal para carga de horas en el sistema NEORIS Timecard.
 
 ## 🚀 Archivo Principal
 
-**`carga_horas_simple.py`** - CargaHorasSimple V5 - ANTI SUNDAY + DETECCIÓN FERIADOS
+**`carga_horas_simple.py`** - CargaHorasSimple V5.2 - ANTI SUNDAY + DETECCIÓN FERIADOS + LOGGING
 
 ### ✅ Garantías del Sistema:
 - 🚫 **NUNCA toca addr1** (Sunday) 
@@ -14,6 +14,7 @@ Automatización semanal para carga de horas en el sistema NEORIS Timecard.
 - ✅ **No interfiere** con pestañas Chrome existentes
 - ✅ **Email automático** con copia a Matías Muñoz
 - ⚡ **100% automático** - Sin confirmaciones manuales
+- 📄 **Logging detallado** - Cada ejecución registrada en archivo (NUEVO V5.2)
 
 ### 🏖️ Detección Inteligente de Feriados (NUEVO en V5)
 
@@ -80,11 +81,37 @@ python carga_horas_simple.py
 
 ```bash
 # Instalar dependencias
-python -m pip install selenium schedule webdriver-manager keyboard
+python -m pip install selenium schedule webdriver-manager keyboard python-dotenv
 
 # Ejecutar agente
 python carga_horas_simple.py
 ```
+
+## ⚙️ Configuración (NUEVO en V5.1)
+
+El sistema usa un archivo `.env` para configuración personalizada:
+
+```bash
+# 1. Copia el template
+cp .env.example .env
+
+# 2. Edita .env con tus valores
+notepad .env
+```
+
+**Variables disponibles:**
+```ini
+EMAIL_DESTINATARIO=laura_aristegui@epamneoris.com
+EMAIL_CC=matias_munoz@epamneoris.com
+TIMECARD_URL=https://hc.neoris.net/timecard/
+HORAS_POR_DIA=8
+```
+
+**Ventajas:**
+- ✅ Sin editar código para cambios de configuración
+- ✅ .env está protegido en .gitignore
+- ✅ Valores por defecto si no existe .env
+- ✅ Más seguro y profesional
 
 ## 📧 Sistema de Notificaciones
 
@@ -110,9 +137,36 @@ python sync_repositorio.py
 ## 📧 Email Automático
 
 El sistema envía automáticamente email de confirmación:
-- **Para:** laura_aristegui@epamneoris.com  
-- **CC:** matias_munoz@epamneoris.com
+- **Para:** Configurable en `.env` (EMAIL_DESTINATARIO)
+- **CC:** Configurable en `.env` (EMAIL_CC)
 - **Contenido:** Resumen de horas cargadas (incluye días procesados y feriados saltados)
+
+💡 **Cambiar destinatarios:** Edita el archivo `.env` sin tocar el código
+
+## 📄 Sistema de Logging (NUEVO en V5.2)
+
+Cada ejecución genera un archivo de log detallado:
+
+```
+logs/
+  carga_2026-03-03_09-30-15.log
+  carga_2026-02-26_10-15-22.log
+  carga_2026-02-19_09-45-18.log
+```
+
+**Información registrada:**
+- 📅 Fecha y hora de ejecución
+- ⏱️ Tiempo total de proceso
+- 📊 Días procesados vs saltados (feriados)
+- ✅ Éxito o error con detalles
+- 🔍 Stack trace completo de errores
+- ⚙️ Configuración utilizada
+
+**Ventajas:**
+- 📊 **Auditoría**: Historial completo de todas las cargas
+- 🔧 **Debugging**: Identifica rápidamente dónde falló algo
+- 📝 **Evidencia**: Registro permanente y consultable
+- 🔍 **Análisis**: Detecta patrones de errores recurrentes
 
 ## 🛡️ Características de Seguridad
 

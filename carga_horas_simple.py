@@ -8,24 +8,81 @@ from selenium.webdriver.chrome.options import Options
 import time
 import os
 import keyboard
+from dotenv import load_dotenv
+import logging
+from datetime import datetime
+import tkinter as tk
+from tkinter import messagebox
+import webbrowser
+import math
+
+# Cargar configuración desde .env
+load_dotenv()
 
 class CargaHorasSimple:
     def __init__(self):
-        self.url = "https://hc.neoris.net/timecard/"
+        # Cargar configuración desde variables de entorno
+        self.url = os.getenv('TIMECARD_URL', 'https://hc.neoris.net/timecard/')
+        self.horas_por_dia = int(os.getenv('HORAS_POR_DIA', '8'))
+        self.email_cc = os.getenv('EMAIL_CC', 'matias_munoz@epamneoris.com')
         self.driver = None
+        
+        # Configurar logging
+        self.timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        self.log_file = f'logs/carga_{self.timestamp}.log'
+        self._configurar_logger()
+        
+        self.logger.info("="*70)
+        self.logger.info("AsistenteParaLaura - CargaHorasSimple V5.2")
+        self.logger.info(f"Inicio de ejecución: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        self.logger.info("="*70)
+        self.logger.info("⚙️ Configuración cargada desde .env:")
+        self.logger.info(f"   📧 Email CC: {self.email_cc}")
+        self.logger.info(f"   ⏰ Horas por día: {self.horas_por_dia}")
+        self.logger.info(f"   🔗 URL: {self.url}")
+        
+        print("⚙️ Configuración cargada desde .env:")
+        print(f"   📧 Email CC: {self.email_cc}")
+        print(f"   ⏰ Horas por día: {self.horas_por_dia}")
+        print(f"   📄 Log: {self.log_file}")
+    
+    def _configurar_logger(self):
+        """Configura el sistema de logging"""
+        # Crear directorio logs si no existe
+        os.makedirs('logs', exist_ok=True)
+        
+        # Configurar logger
+        self.logger = logging.getLogger('CargaHoras')
+        self.logger.setLevel(logging.INFO)
+        
+        # Handler para archivo
+        file_handler = logging.FileHandler(self.log_file, encoding='utf-8')
+        file_handler.setLevel(logging.INFO)
+        
+        # Formato del log
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(formatter)
+        
+        # Limpiar handlers previos y agregar nuevo
+        self.logger.handlers.clear()
+        self.logger.addHandler(file_handler)
     
     def iniciar_navegador(self):
         """Inicia el navegador Chrome SIN cerrar pestañas existentes de Laura"""
         try:
+            self.logger.info("Iniciando navegador Chrome...")
             # Solo cerrar MI driver previo si existe, NO todo Chrome
             if hasattr(self, 'driver') and self.driver:
                 print("🔄 Cerrando solo mi navegador anterior del agente...")
+                self.logger.info("Cerrando navegador anterior del agente")
                 try:
                     self.driver.quit()
                     time.sleep(2)
                     print("✅ Mi navegador anterior cerrado")
+                    self.logger.info("Navegador anterior cerrado correctamente")
                 except Exception as e:
                     print(f"⚠️ Error cerrando mi navegador: {e}")
+                    self.logger.warning(f"Error cerrando navegador anterior: {e}")
             
             # Configuraciones Chrome para nueva instancia independiente
             chrome_options = Options()
@@ -44,10 +101,12 @@ class CargaHorasSimple:
             time.sleep(5)
             
             print("✅ Navegador del agente listo (tus otras pestañas intactas)")
+            self.logger.info("Navegador Chrome iniciado correctamente")
             return True
             
         except Exception as e:
             print(f"❌ Error iniciando navegador del agente: {e}")
+            self.logger.error(f"Error iniciando navegador: {e}")
             return False
     
     def verificar_horas_iniciales(self):
@@ -58,17 +117,21 @@ class CargaHorasSimple:
             horas_actuales = elemento_hours.text.strip()
             
             print(f"\n📊 Horas totales al inicio: {horas_actuales}")
+            self.logger.info(f"Horas totales detectadas al inicio: {horas_actuales}")
             
             if horas_actuales not in ['0', '0.0', '']:
                 print(f"⚠️ DETECTADAS horas pre-cargadas: {horas_actuales} horas")
                 print("💡 Verificaré cada día para detectar feriados/entradas aprobadas")
+                self.logger.info(f"Horas pre-cargadas detectadas: {horas_actuales} (posibles feriados)")
                 return True, horas_actuales
             else:
                 print("✅ No hay horas pre-cargadas")
+                self.logger.info("No hay horas pre-cargadas, semana normal")
                 return False, "0"
                 
         except Exception as e:
             print(f"⚠️ Error verificando horas iniciales: {e}")
+            self.logger.error(f"Error verificando horas iniciales: {e}")
             return False, "0"
     
     def verificar_horas_en_dia(self, dia_hours_id):
@@ -468,7 +531,8 @@ class CargaHorasSimple:
                         'feriados_nombres': dias_saltados_nombres,
                         'horas_previas': horas_previas_num,
                         'horas_nuevas': horas_esperadas,
-                        'horas_totales': horas_totales_esperadas
+                        'horas_totales': horas_totales_esperadas,
+                        'url_navegador': self.driver.current_url if self.driver else self.url
                     }
                         
                 else:
@@ -577,43 +641,60 @@ class CargaHorasSimple:
             print(f"💥 Error general: {e}")
             return False
     
-    def enviar_notificacion_outlook(self, email, dias_cargados, feriados_saltados, feriados_nombres, horas_previas, horas_nuevas, horas_totales):
-        """Envía correo de confirmación con detalles de la carga"""
+    def enviar_notificacion_outlook(self, email, dias_cargados, feriados_saltados, feriados_nombres, horas_previas, horas_nuevas, horas_totales, url_navegador=None):
+        """Envía correo de confirmación con detalles de la carga - Diseño EPAM-NEORIS"""
         try:
             # Construir resumen
             if feriados_saltados > 0:
-                resumen_feriados = f"\n🏖️ Feriados detectados y saltados: {feriados_saltados} día(s)\n   ({', '.join(feriados_nombres)})"
+                resumen_feriados = f"\n   🏖️ Feriados: {', '.join(feriados_nombres)}"
             else:
-                resumen_feriados = "\n✅ Sin feriados detectados"
+                resumen_feriados = ""
+            
+            # Usar la URL pasada o la URL por defecto
+            if not url_navegador:
+                url_navegador = self.url
             
             asunto = f"✅ Horas cargadas - Semana {dias_cargados} días"
-            cuerpo = f"""Estimada Laura,
+            cuerpo = f"""Hola Laura,
 
-La carga de horas semanales ha sido completada exitosamente.
+✅ CARGA COMPLETADA EXITOSAMENTE
 
-📊 RESUMEN DE CARGA:
-━━━━━━━━━━━━━━━━━━━━━━━
-✅ Días cargados: {dias_cargados}
-🏖️ Feriados saltados: {feriados_saltados}{resumen_feriados}
+───────────────────────────────────────────────
+📊 RESUMEN DE LA SEMANA
+───────────────────────────────────────────────
+   ✅ Días cargados: {dias_cargados} días
+   🚫 Feriados saltados: {feriados_saltados}{resumen_feriados}
 
-💼 HORAS TOTALES:
-━━━━━━━━━━━━━━━━━━━━━━━
-• Horas previas (feriados): {horas_previas}h
-• Horas nuevas cargadas: {horas_nuevas}h
-• Total semanal: {horas_totales}h
+───────────────────────────────────────────────
+💼 DETALLE DE HORAS
+───────────────────────────────────────────────
+   • Horas previas: {horas_previas}h
+   • Horas cargadas: {horas_nuevas}h
+   • TOTAL SEMANAL: {horas_totales}h
 
-🔒 GARANTÍAS:
-━━━━━━━━━━━━━━━━━━━━━━━
-🚫 Sunday (addr1): NO procesado
-✅ Detección automática de feriados
-✅ Verificación de totales: OK
+───────────────────────────────────────────────
+🔒 VALIDACIONES
+───────────────────────────────────────────────
+   🚫 Sunday/Saturday: NO procesados
+   ✅ Detección de feriados: Automática
+   ✅ Verificación de totales: OK
+
+───────────────────────────────────────────────
+🔗 ACCESO RÁPIDO
+───────────────────────────────────────────────
+
+   🌐 Link del timecard: {url_navegador}
+
+   ⏰ Próximo paso: Submitear las horas antes del viernes
+
+───────────────────────────────────────────────
 
 Saludos,
-AsistenteParaLaura V5.0"""
+AsistenteParaLaura | EPAM-NEORIS TimeCard Bot"""
             
             subject_encoded = asunto.replace(" ", "%20")
             body_encoded = cuerpo.replace("\n", "%0D%0A").replace(" ", "%20")
-            cc_email = "matias_munoz@epamneoris.com"
+            cc_email = self.email_cc  # Usar CC desde configuración
             
             mailto_link = f"mailto:{email}?cc={cc_email}&subject={subject_encoded}&body={body_encoded}"
             
@@ -640,20 +721,235 @@ AsistenteParaLaura V5.0"""
             print(f"✗ Error enviando correo: {e}")
             return False
     
+    def mostrar_popup_confirmacion(self, url_timecard):
+        """Muestra popup con confirmación y botón para ir al timecard - Diseño EPAM-NEORIS ELÉCTRICO"""
+        try:
+            # Colores ELÉCTRICOS inspirados en la imagen
+            COLOR_FONDO = "#0A1628"           # Azul muy oscuro
+            COLOR_AZUL_ELECTRICO = "#00D4FF"  # Azul eléctrico brillante
+            COLOR_AZUL_MEDIO = "#0099FF"      # Azul medio vibrante
+            COLOR_NARANJA = "#FF8C00"         # Naranja brillante
+            COLOR_NARANJA_CLARO = "#FFA500"   # Naranja claro
+            COLOR_TEXTO_CLARO = "#FFFFFF"     # Blanco
+            COLOR_TEXTO_GRIS = "#A0B0C0"      # Gris azulado
+            
+            # Crear ventana principal
+            ventana = tk.Tk()
+            ventana.title("EPAM-NEORIS | TimeCard")
+            ventana.geometry("600x350")
+            ventana.resizable(False, False)
+            ventana.configure(bg=COLOR_FONDO)
+            
+            # Configurar para que aparezca al frente
+            ventana.attributes('-topmost', True)
+            ventana.focus_force()
+            
+            # Canvas para fondo con efectos eléctricos
+            canvas = tk.Canvas(ventana, width=600, height=350, bg=COLOR_FONDO, highlightthickness=0)
+            canvas.pack(fill='both', expand=True)
+            
+            # Crear efecto de fondo eléctrico con círculos y líneas
+            # Círculos concéntricos en la esquina inferior izquierda (estilo rueda dentada)
+            for i in range(6, 0, -1):
+                radio = i * 25
+                color_circulo = COLOR_AZUL_MEDIO if i % 2 == 0 else COLOR_AZUL_ELECTRICO
+                canvas.create_oval(
+                    -radio, 350 - radio,
+                    radio, 350 + radio,
+                    outline=color_circulo, width=2, fill=""
+                )
+            
+            # Partículas naranjas flotantes (estilo datos/transmisión)
+            for i in range(15):
+                x = 400 + (i * 12) + (i % 3 * 5)
+                y = 50 + (i * 15) - (i % 2 * 10)
+                size = 3 + (i % 3)
+                canvas.create_oval(
+                    x - size, y - size,
+                    x + size, y + size,
+                    fill=COLOR_NARANJA, outline=""
+                )
+            
+            # Líneas tech decorativas
+            canvas.create_line(450, 80, 550, 80, fill=COLOR_NARANJA_CLARO, width=2)
+            canvas.create_line(480, 100, 540, 100, fill=COLOR_NARANJA, width=1)
+            
+            # Hexágonos sutiles en el fondo
+            for i in range(0, 700, 70):
+                for j in range(0, 400, 60):
+                    offset = 35 if (j // 60) % 2 else 0
+                    canvas.create_polygon(
+                        i + offset, j + 15,
+                        i + offset + 15, j,
+                        i + offset + 45, j,
+                        i + offset + 60, j + 15,
+                        i + offset + 45, j + 30,
+                        i + offset + 15, j + 30,
+                        fill="", outline="#1E2D3D", width=1
+                    )
+            
+            # Frame principal sobre el canvas con fondo semitransparente
+            frame = tk.Frame(canvas, bg=COLOR_FONDO, padx=30, pady=25)
+            canvas.create_window(300, 175, window=frame)
+            
+            # Header con logos
+            header_frame = tk.Frame(frame, bg=COLOR_FONDO)
+            header_frame.pack(pady=(0, 15))
+            
+            # Logo EPAM con tipografía monoespaciada (MÁS GRANDE)
+            logo_epam = tk.Label(
+                header_frame,
+                text="<epam>",
+                font=("Courier New", 16, "bold"),
+                fg=COLOR_TEXTO_CLARO,
+                bg=COLOR_FONDO
+            )
+            logo_epam.pack()
+            
+            # Logo NEORIS con tipografía espaciada (MÁS GRANDE)
+            logo_neoris = tk.Label(
+                header_frame,
+                text="N E O R I S",
+                font=("Arial", 13, "normal"),
+                fg=COLOR_TEXTO_CLARO,
+                bg=COLOR_FONDO
+            )
+            logo_neoris.pack(pady=(3, 0))
+            
+            # Línea decorativa azul eléctrico
+            linea = tk.Frame(frame, bg=COLOR_AZUL_ELECTRICO, height=3)
+            linea.pack(fill='x', pady=(0, 20))
+            
+            # Título principal
+            titulo = tk.Label(
+                frame,
+                text="✓ Carga Completada Exitosamente",
+                font=("Segoe UI", 18, "bold"),
+                fg=COLOR_AZUL_ELECTRICO,
+                bg=COLOR_FONDO
+            )
+            titulo.pack(pady=(0, 15))
+            
+            # Mensaje principal
+            mensaje = tk.Label(
+                frame,
+                text="Las horas semanales han sido cargadas correctamente.\nAhora puedes proceder a submitear en el TimeCard.",
+                font=("Segoe UI", 11),
+                fg=COLOR_TEXTO_CLARO,
+                bg=COLOR_FONDO,
+                justify="center"
+            )
+            mensaje.pack(pady=(0, 25))
+            
+            # Frame para botones
+            frame_botones = tk.Frame(frame, bg=COLOR_FONDO)
+            frame_botones.pack(pady=10)
+            
+            # Función para abrir el timecard
+            def abrir_timecard():
+                try:
+                    webbrowser.open(url_timecard)
+                    ventana.destroy()
+                except Exception as e:
+                    messagebox.showerror("Error", f"No se pudo abrir el navegador: {e}")
+            
+            # Botón principal - Ir al Timecard (azul eléctrico, MÁS PEQUEÑO)
+            btn_ir = tk.Button(
+                frame_botones,
+                text="→ Ir al TimeCard",
+                font=("Segoe UI", 10, "bold"),
+                bg=COLOR_AZUL_ELECTRICO,
+                fg=COLOR_FONDO,
+                activebackground=COLOR_AZUL_MEDIO,
+                activeforeground=COLOR_FONDO,
+                relief="flat",
+                padx=25,
+                pady=10,
+                cursor="hand2",
+                command=abrir_timecard,
+                borderwidth=0
+            )
+            btn_ir.pack(side="left", padx=8)
+            
+            # Efecto hover para botón principal
+            def on_enter_ir(e):
+                btn_ir.config(bg="#34495E", fg=COLOR_TEXTO_CLARO)
+            def on_leave_ir(e):
+                btn_ir.config(bg=COLOR_AZUL_ELECTRICO, fg=COLOR_FONDO)
+            btn_ir.bind("<Enter>", on_enter_ir)
+            btn_ir.bind("<Leave>", on_leave_ir)
+            
+            # Botón secundario - Cerrar (EN NEGRITA)
+            btn_cerrar = tk.Button(
+                frame_botones,
+                text="Cerrar",
+                font=("Segoe UI", 10, "bold"),
+                bg=COLOR_FONDO,
+                fg=COLOR_TEXTO_GRIS,
+                activebackground="#34495E",
+                activeforeground=COLOR_TEXTO_CLARO,
+                relief="flat",
+                padx=25,
+                pady=10,
+                cursor="hand2",
+                command=ventana.destroy,
+                borderwidth=1,
+                highlightbackground=COLOR_TEXTO_GRIS,
+                highlightthickness=1
+            )
+            btn_cerrar.pack(side="left", padx=8)
+            
+            # Efecto hover para botón cerrar
+            def on_enter_cerrar(e):
+                btn_cerrar.config(bg="#34495E", fg=COLOR_TEXTO_CLARO)
+            def on_leave_cerrar(e):
+                btn_cerrar.config(bg=COLOR_FONDO, fg=COLOR_TEXTO_GRIS)
+            btn_cerrar.bind("<Enter>", on_enter_cerrar)
+            btn_cerrar.bind("<Leave>", on_leave_cerrar)
+            
+            # Footer con recordatorio
+            footer_frame = tk.Frame(frame, bg=COLOR_FONDO)
+            footer_frame.pack(pady=(20, 0))
+            
+            nota = tk.Label(
+                footer_frame,
+                text="💡 Recordá submitear las horas antes del viernes",
+                font=("Segoe UI", 9),
+                fg=COLOR_TEXTO_GRIS,
+                bg=COLOR_FONDO
+            )
+            nota.pack()
+            
+            # Centrar ventana en la pantalla
+            ventana.update_idletasks()
+            x = (ventana.winfo_screenwidth() // 2) - (ventana.winfo_width() // 2)
+            y = (ventana.winfo_screenheight() // 2) - (ventana.winfo_height() // 2)
+            ventana.geometry(f"+{x}+{y}")
+            
+            # Iniciar loop
+            ventana.mainloop()
+            
+        except Exception as e:
+            print(f"⚠️ Error mostrando popup: {e}")
+    
     def ejecutar(self, email):
         """Ejecuta la estrategia simple completa"""
-        print("🚀 Iniciando CargaHorasSimple V5 - ANTI SUNDAY + DETECCIÓN FERIADOS")
+        print("🚀 Iniciando CargaHorasSimple V5.2 - ANTI SUNDAY + DETECCIÓN FERIADOS + LOGGING")
         print("💡 GARANTIZA: Solo Monday-Friday (NO Sunday/Saturday)")
         print("🏖️ DETECTA: Feriados automáticamente (no carga si ya están aprobados)")
         print("✅ NO cerrará tus pestañas de Chrome existentes")
         print("🚫 NUNCA tocará Sunday ni Saturday")
         print("="*70)
         
+        self.logger.info(f"Iniciando proceso de carga para: {email}")
+        inicio_tiempo = time.time()
+        
         try:
             # Verificar que el navegador se inicie correctamente
             navegador_ok = self.iniciar_navegador()
             if not navegador_ok:
                 print("💥 ERROR: No se pudo iniciar el navegador")
+                self.logger.error("Fallo al iniciar navegador - proceso abortado")
                 return
             
             resultado = self.cargar_horas_estrategia_simple()
@@ -670,6 +966,9 @@ AsistenteParaLaura V5.0"""
             # Enviar correo automáticamente si la carga fue exitosa
             if resultado.get('exito', False):
                 print("\n📧 Enviando correo de confirmación automáticamente...")
+                self.logger.info("Carga exitosa - Enviando email de confirmación")
+                self.logger.info(f"Resumen: {resultado['dias_cargados']} días cargados, {resultado['feriados_saltados']} feriados saltados")
+                self.logger.info(f"Horas: {resultado['horas_previas']}h previas + {resultado['horas_nuevas']}h nuevas = {resultado['horas_totales']}h totales")
                 self.enviar_notificacion_outlook(
                     email,
                     resultado['dias_cargados'],
@@ -677,38 +976,60 @@ AsistenteParaLaura V5.0"""
                     resultado['feriados_nombres'],
                     resultado['horas_previas'],
                     resultado['horas_nuevas'],
-                    resultado['horas_totales']
+                    resultado['horas_totales'],
+                    resultado.get('url_navegador', self.url)
                 )
+                
+                # Mostrar popup de confirmación
+                url_timecard = resultado.get('url_navegador', self.url)
+                print("\n🔔 Mostrando popup de confirmación...")
+                self.logger.info("Mostrando popup de confirmación al usuario")
+                self.mostrar_popup_confirmacion(url_timecard)
             else:
                 print("❌ No se enviará correo debido a problemas persistentes")
+                self.logger.error("Carga fallida - No se enviará correo")
+            
+            # Log de tiempo de ejecución
+            tiempo_total = time.time() - inicio_tiempo
+            minutos = int(tiempo_total // 60)
+            segundos = int(tiempo_total % 60)
+            self.logger.info(f"Tiempo de ejecución: {minutos}m {segundos}s")
+            self.logger.info("="*70)
+            self.logger.info("Proceso completado")
+            self.logger.info("="*70)
                 
             print("\n✅ Proceso completado")
+            print(f"📄 Log guardado en: {self.log_file}")
             
         except Exception as e:
             print(f"💥 Error en ejecución: {e}")
+            self.logger.error(f"Error crítico en ejecución: {e}", exc_info=True)
             # Intentar cerrar navegador incluso si hay error
             try:
                 if hasattr(self, 'driver') and self.driver:
                     print("🔒 Cerrando navegador...")
                     self.driver.quit()
-            except:
-                pass
-                
-            print("\n✅ Proceso completado")
+                    self.logger.info("Navegador cerrado después de error")
+            except Exception as close_error:
+                self.logger.error(f"Error cerrando navegador: {close_error}")
             
-        except Exception as e:
-            print(f"💥 Error en ejecución: {e}")
-            # Intentar cerrar navegador incluso si hay error
-            try:
-                if hasattr(self, 'driver') and self.driver:
-                    print("🔒 Cerrando navegador...")
-                    self.driver.quit()
-            except:
-                pass
+            # Log de finalización con error
+            tiempo_total = time.time() - inicio_tiempo
+            self.logger.info(f"Proceso finalizado con errores - Tiempo: {int(tiempo_total)}s")
+            self.logger.info("="*70)
+                
+            print("\n❌ Proceso completado con errores")
+            print(f"📄 Log guardado en: {self.log_file}")
 
 # Configuración
 if __name__ == "__main__":
-    TU_EMAIL = "laura_aristegui@epamneoris.com"
+    # Cargar email desde variable de entorno (más seguro y configurable)
+    email_destinatario = os.getenv('EMAIL_DESTINATARIO', 'laura_aristegui@epamneoris.com')
+    
+    print("="*70)
+    print("📧 Email destinatario:", email_destinatario)
+    print("💡 Para cambiar, edita el archivo .env")
+    print("="*70)
     
     agente = CargaHorasSimple()
-    agente.ejecutar(TU_EMAIL)
+    agente.ejecutar(email_destinatario)

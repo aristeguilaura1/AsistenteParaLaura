@@ -9,7 +9,7 @@
 
 ### 🔍 Verificación y Validación
 - [ ] Captura de pantalla automática como evidencia
-- [ ] Log detallado de cada ejecución guardado en archivo
+- [x] Log detallado de cada ejecución guardado en archivo
 - [ ] Validación de que el usuario ya está autenticado antes de empezar
 
 ### 📧 Notificaciones
@@ -23,8 +23,8 @@
 - [ ] Modo debug para troubleshooting
 
 ### ⚙️ Configuración
-- [ ] Archivo de configuración externo (.env o config.json)
-- [ ] Permitir configurar email destinatario sin editar código
+- [x] Archivo de configuración externo (.env o config.json)
+- [x] Permitir configurar email destinatario sin editar código
 - [ ] Opciones para diferentes proyectos/clientes
 
 ### 📊 Reporting
@@ -40,6 +40,28 @@
 ---
 
 ## ✅ Mejoras Completadas
+
+### V5.2 (03/03/2026) - LOGGING DETALLADO
+- ✅ Sistema de logging completo con archivo por ejecución
+- ✅ Logs guardados en logs/carga_YYYY-MM-DD_HH-MM-SS.log
+- ✅ Registro de todos los pasos importantes
+- ✅ Información de errores con stack trace completo
+- ✅ Tiempo de ejecución registrado
+- ✅ Resumen de días cargados y feriados en log
+- ✅ logs/ agregado a .gitignore
+
+**Impacto:** Auditoría completa de cada ejecución, debugging más fácil, evidencia permanente de cargas.
+
+### V5.1 (03/03/2026) - CONFIGURACIÓN EXTERNA
+- ✅ Archivo .env para configuración externa
+- ✅ Variables configurables sin editar código
+- ✅ EMAIL_DESTINATARIO y EMAIL_CC personalizables
+- ✅ HORAS_POR_DIA configurable
+- ✅ .env.example como template
+- ✅ .gitignore creado para proteger .env
+- ✅ Valores por defecto si no existe .env
+
+**Impacto:** Sistema más profesional, mantenible y seguro. Cambios de configuración sin tocar código.
 
 ### V5.0 (20/02/2026) - DETECCIÓN INTELIGENTE DE FERIADOS
 - ✅ Verificación inicial de Hours_TC para detectar horas pre-cargadas
